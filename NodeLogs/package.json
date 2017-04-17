@@ -1,0 +1,25 @@
+{
+  "name": "nodelog",
+  "version": "1.0.0",
+  "description": "Node log based on the project, and will be stored to mongodb",
+  "main": "app.js",
+  "dependencies": {
+    "body-parser": "^1.12.3",
+    "ejs": "^2.3.1",
+    "events": "^1.1.0",
+    "http": "^0.0.0",
+    "mongodb": "^1.4.29",
+    "net": "^1.0.2",
+    "request": "^2.36.0",
+    "socket.io": "^1.4.5",
+    "url": "^0.11.0",
+    "xss": "^0.1.21"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "dth team",
+  "license": "MIT"
+}
