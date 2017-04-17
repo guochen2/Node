@@ -1,0 +1,16 @@
+{
+  "name": "nodemysql",
+  "version": "1.0.0",
+  "description": "this is dth mysql to node demo",
+  "main": "index.js",
+  "dependencies": {
+    "co": "^4.6.0",
+    "mysql": "^2.13.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "guo",
+  "license": "MIT"
+}
