@@ -34,16 +34,13 @@ var handler = {
         }
         return result;
     },
-    // get: function* (data) {
-    //     var result = checkpar({ k: data.k });
-    //     if (result) { return result }
-    //     try {
-    //         result = yield (yield redislock.init()).get(data.k);
-    //     } catch (e) {
-    //         return e;
-    //     }
-    //     return result;
-    // },
+    get: function* (data) {
+        //如果参数错误 直接异常 不进行try拦截 底层错误 异常直接往外面抛
+        var result = checkpar({ k: data.k });
+        if (result) { throw result; return; }
+        result = yield (yield redislock.init()).get(data.k);
+        return result;
+    },
     addnx: function* (data) {
         if (!/^\d+$/.test(data.t)) {
             return "parmes t is error";
@@ -78,7 +75,7 @@ var query = function* (url, data) {
     switch (url) {
         case "add": return yield handler.add(data); break;
         case "remove": return yield handler.remove(data); break;
-        // case "get": return yield handler.get(data); break;
+        case "get": return yield handler.get(data); break;
         case "addnx": return yield handler.addnx(data); break;
         default: return "operation error";
     }

@@ -8,8 +8,7 @@ client = redis.createClient(clientoption);
 client.on("ready", function (err) {
     // redis.debug_mode = true;
     if (err) {
-        // console.log(err);
-        reject(err);
+        console.log(err);
     } else {
         console.log("redis read ok");
         log.logger.info("redis read ok");
