@@ -20,8 +20,8 @@ client.on("error", function (err) {
 })
 var handler = {
     //添加 若成功返回success 失败返回faild 异常直接抛
-    add: function* (key, value, second) {
-        return yield new Promise(function (resolve, reject) {
+    add: async function (key, value, second) {
+        return new Promise(function (resolve, reject) {
             if (!key) {
                 reject("key is not empty");
                 return;
@@ -48,8 +48,8 @@ var handler = {
             })
         })
     },
-    remove: function* (key) {
-        return yield new Promise(function (resolve, reject) {
+    remove: async function (key) {
+        return new Promise(function (resolve, reject) {
             if (!key) {
                 reject("key is not empty");
                 return;
@@ -61,8 +61,8 @@ var handler = {
                 }
             })
         })
-    }, get: function* (key) {
-        return yield new Promise(function (resolve, reject) {
+    }, get: async function (key) {
+        return new Promise(function (resolve, reject) {
             if (!key) {
                 reject("key is not empty");
                 return;
@@ -77,8 +77,8 @@ var handler = {
     }
 }
 
-///初始化
-var init = function* () {
+///初始化 此处使用async 为了后续扩展
+var init = async function () {
     return handler;
 }
 

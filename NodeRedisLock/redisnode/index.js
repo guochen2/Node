@@ -1,31 +1,29 @@
 var redislock = require("./redislock");
 var common = require("./common");
-
-var co = require("co");
 var handler = {
-    add: function* (data) {
+    add: async function (data) {
         if (!/^\d+$/.test(data.s)) {
             return "parmes s is error";
         }
         var result = checkpar({ k: data.k, v: data.v, s: data.s });
         if (result) { return result }
         try {
-            result = yield (yield redislock.init()).add(data.k, data.v, data.s);
+            result = await (await redislock.init()).add(data.k, data.v, data.s);
         } catch (ex) {
             return ex;
         }
         return result;
     },
-    remove: function* (data) {
+    remove: async function (data) {
         var result = checkpar({ k: data.k, v: data.v });
         if (result) { return result }
         try {
-            result = yield (yield redislock.init()).get(data.k);
+            result = await (await redislock.init()).get(data.k);
             if (!result) {
                 return "key not exists";
             }
             if (data.v == result) {
-                result = yield (yield redislock.init()).remove(data.k);
+                result = await (await redislock.init()).remove(data.k);
             } else {
                 return "key or value not correct";
             }
@@ -34,14 +32,14 @@ var handler = {
         }
         return result;
     },
-    get: function* (data) {
+    get: async function (data) {
         //如果参数错误 直接异常 不进行try拦截 底层错误 异常直接往外面抛
         var result = checkpar({ k: data.k });
         if (result) { throw result; return; }
-        result = yield (yield redislock.init()).get(data.k);
+        result = await (await redislock.init()).get(data.k);
         return result;
     },
-    addnx: function* (data) {
+    addnx: async function (data) {
         if (!/^\d+$/.test(data.t)) {
             return "parmes t is error";
         } if (!/^\d+$/.test(data.s)) {
@@ -52,13 +50,13 @@ var handler = {
         if (result) { return result };
         var dt = new Date();
         while (true) {
-            if ((yield (yield redislock.init()).add(data.k, data.v, data.s)) == "success") {
+            if ((await (await redislock.init()).add(data.k, data.v, data.s)) == "success") {
                 return "success";
             } else {
                 if ((new Date().getTime() - dt.getTime()) / 1000 > data.t) {
                     return "timeout at " + data.t + " s";
                 }
-                yield common.sleep(2);
+                await common.sleep(2);
             }
         }
     },
@@ -71,12 +69,12 @@ var checkpar = function (data) {
     }
     return "";
 };
-var query = function* (url, data) {
+var query = async function (url, data) {
     switch (url) {
-        case "add": return yield handler.add(data); break;
-        case "remove": return yield handler.remove(data); break;
-        case "get": return yield handler.get(data); break;
-        case "addnx": return yield handler.addnx(data); break;
+        case "add": return await handler.add(data); break;
+        case "remove": return await handler.remove(data); break;
+        case "get": return await handler.get(data); break;
+        case "addnx": return await handler.addnx(data); break;
         default: return "operation error";
     }
 };
