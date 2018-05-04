@@ -20,7 +20,7 @@ var server = http.createServer(async function (req, res) {
         }
         return;
     }
-    fs.readFile(__dirname + "/read.me", "utf-8", function (err, d) {
+    fs.readFile(__dirname + "/README.md", "utf-8", function (err, d) {
         if (err) {
             res.end(err);
         } else {
