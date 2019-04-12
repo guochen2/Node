@@ -1,7 +1,7 @@
 {
   "name": "nodenat",
   "version": "1.0.0",
-  "description": "This is an intranet penetration tool",
+  "description": "This is an intranet penetration tool https://www.processon.com/view/link/5cafec3be4b02a2858e87d93",
   "main": "clientproxy.js",
   "dependencies": {
     "co": "^4.6.0",
