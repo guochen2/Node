@@ -19,6 +19,7 @@ net.createServer(function (clientSocket) {
     common.log(" TCP main server accepting connection on port: " + LOCAL_PORT);
 }).listen(LOCAL_PORT);
 
+var maininterval = null;
 //主通道连接 向服务端发起
 function firstconnect() {
     var serviceSocket = new net.Socket();
@@ -45,6 +46,10 @@ function firstconnect() {
         common.log('通信链接通道关闭 需要重新发起');
         firstconnect();
     });
+    if (maininterval) clearInterval(maininterval);
+    maininterval = setInterval(function () {
+        serviceSocket.write("main connecting");
+    }, 5000)
 }
 
 //新开一个与服务端通信的通道

@@ -138,6 +138,14 @@ var clientProxyServer = net.createServer(function (clientSocket) {
             common.log("获取到一个新的副通道");
             emiter = new events.EventEmitter();
             currclientData.push({ uuid: uuid, socket: clientSocket, emiter: emiter, useing: false })
+        } else if (msg.toString() == "main connecting") {
+            common.log("接收到client的测试main请求");
+            if (currmainsocket) {
+                // common.log("main存在");
+            } else {
+                common.log("main 不存在 将当前socket赋值");
+                currmainsocket = clientSocket;
+            }
         } else {
             // var clients = currclientData.filter(a => a.uuid = uuid);
             // if (clients.length > 0)
