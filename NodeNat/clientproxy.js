@@ -66,12 +66,18 @@ function openserverconnect() {
     });
     proxySocket.on('end', function () {
         common.log('客户端与服务端的副请求socket end');
+        if (proxySocket.clientSocket) proxySocket.clientSocket.end();
     });
     //服务端连接出问题，断开客户端
     proxySocket.on('error', function (err) {
         common.log('客户端与服务端的副请求socket err', err);
+        if (proxySocket.clientSocket) proxySocket.clientSocket.end();
     });
 }
+
+//若服务端与client链接关闭 则client与目标通信也要关闭
+//存储副通道与目标通道的数据
+
 
 //与目标地址通信的通道
 function openproxyconnect(proxySocket, data) {
