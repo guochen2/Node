@@ -19,6 +19,7 @@ net.createServer(function (clientSocket) {
     common.log(" TCP main server accepting connection on port: " + LOCAL_PORT);
 }).listen(LOCAL_PORT);
 
+//主通道连接 向服务端发起
 function firstconnect() {
     var serviceSocket = new net.Socket();
     serviceSocket.connect(ServerProxy_POST, ServerProxy_HOST, function () {
@@ -45,6 +46,8 @@ function firstconnect() {
         firstconnect();
     });
 }
+
+//新开一个与服务端通信的通道
 function openserverconnect() {
     var proxySocket = new net.Socket();
     proxySocket.connect(ServerProxy_POST, ServerProxy_HOST, function () {
@@ -69,6 +72,8 @@ function openserverconnect() {
         common.log('客户端与服务端的副请求socket err', err);
     });
 }
+
+//与目标地址通信的通道
 function openproxyconnect(proxySocket, data) {
     common.log("打开客户端配置的待请求地址socket")
     var clientSocket = new net.Socket();
@@ -94,6 +99,6 @@ function openproxyconnect(proxySocket, data) {
         proxySocket.end();
     });
 }
-
+//打开主通道
 firstconnect();
 common.log(`配置请求端:${REMOTE_HOST}:${REMOTE_PORT}`);
