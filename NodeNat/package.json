@@ -1,0 +1,17 @@
+{
+  "name": "nodenat",
+  "version": "1.0.0",
+  "description": "This is an intranet penetration tool",
+  "main": "clientproxy.js",
+  "dependencies": {
+    "co": "^4.6.0",
+    "async-lock": "^1.2.0",
+    "node-uuid": "^1.4.8"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "GUO",
+  "license": "MIT"
+}
