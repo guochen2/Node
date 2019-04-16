@@ -80,6 +80,8 @@ function firstconnect() {
         // common.log('<< From remote to proxy', data.toString());
         if (data.toString() == "open connect") {//打开新的链接
             openserverconnect();
+        } else if (data.toString() == "main connecting") {
+            common.log("接收到server的测试main请求");
         }
         else {
             common.log("通信通道接收到错误数据", data.toString());
@@ -96,9 +98,11 @@ function firstconnect() {
         firstconnect();
     });
     if (maininterval) clearInterval(maininterval);
-    maininterval = setInterval(function () {
-        serviceSocket.write("main connecting");
-    }, 5000)
+    setTimeout(function () {
+        maininterval = setInterval(function () {
+            serviceSocket.write("main connecting");
+        }, 5000)
+    }, 1000)
 }
 
 //新开一个与服务端通信的通道

@@ -250,3 +250,8 @@ setInterval(function () {
         }
     })
 }, 2000);
+setInterval(function () {
+    if (currmainsocket) {
+        currmainsocket.write("main connecting")
+    }
+}, 5000)
