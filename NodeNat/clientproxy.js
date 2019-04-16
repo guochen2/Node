@@ -1,23 +1,72 @@
 
 var net = require('net');
-
-
-var config = require("./config").config;
 var common = require("./common").common;
-//服务监听 
-var LOCAL_PORT = config.Client.LOCAL_PORT;
-var ServerProxy_HOST = config.Client.ServerProxy_HOST;
-var ServerProxy_POST = config.Client.ServerProxy_POST;
+var fs = require("fs");
+const path = require("path");
 
-//反向代理远程服务器
-var REMOTE_PORT = config.Client.REMOTE_PORT;
-//反向代理地址
-var REMOTE_HOST = config.Client.REMOTE_HOST;
+var ServerProxy_HOST, ServerProxy_POST, REMOTE_PORT, REMOTE_HOST;
+
+//初始化配置 默认命令行优先级比config高
+function init(callback) {
+    fs.exists(path.join(__dirname, "config.js"), function (exists) {
+        if (process.argv.length > 2) {
+            //命令行参数 sh:ServerProxy_HOST,sp:ServerProxy_POST,rh:REMOTE_HOST,rp:REMOTE_PORT
+            try {
+                var option = {};
+                for (var i = 2; i < process.argv.length; i++) {
+                    option[process.argv[i].split("=")[0]] = process.argv[i].split("=")[1];
+                }
+                if (option.sh && option.sp && option.rh && option.rp) {
+                    initsetting({
+                        ServerProxy_HOST: option.sh,
+                        ServerProxy_POST: option.sp,
+                        REMOTE_PORT: option.rp,
+                        REMOTE_HOST: option.rh,
+                    })
+                    callback();
+                    return;
+                }
+            } catch (e) {
+
+            }
+        } else if (exists) {
+            var config = require("./config").config;
+            initsetting({
+                ServerProxy_HOST: config.Client.ServerProxy_HOST,
+                ServerProxy_POST: config.Client.ServerProxy_POST,
+                REMOTE_PORT: config.Client.REMOTE_PORT,
+                REMOTE_HOST: config.Client.REMOTE_HOST,
+            });
+            callback();
+            return;
+        }
+        var result = "配置异常，请使用config配置或者命令行参数(sh:ServerProxy_HOST,sp:ServerProxy_POST,rh:REMOTE_HOST,rp:REMOTE_PORT) sh=  sp=  rh=  rp= 默认命令行优先级比config高";
+        common.log(result);
+        throw new Error(result);
+    })
+}
+function initsetting(option) {
+    ServerProxy_HOST = option.ServerProxy_HOST;
+    ServerProxy_POST = option.ServerProxy_POST;
+    REMOTE_PORT = option.REMOTE_PORT;
+    REMOTE_HOST = option.REMOTE_HOST;
+}
+
+//服务监听 
+// var LOCAL_PORT = config.Client.LOCAL_PORT;
+// var ServerProxy_HOST = config.Client.ServerProxy_HOST;
+// var ServerProxy_POST = config.Client.ServerProxy_POST;
+
+// //反向代理远程服务器
+// var REMOTE_PORT = config.Client.REMOTE_PORT;
+// //反向代理地址
+// var REMOTE_HOST = config.Client.REMOTE_HOST;
+//读取命令行配置 优先配置行命令
 
 //防止线程退出
-net.createServer(function (clientSocket) {
-    common.log(" TCP main server accepting connection on port: " + LOCAL_PORT);
-}).listen(LOCAL_PORT);
+// net.createServer(function (clientSocket) {
+//     common.log(" TCP main server accepting connection on port: " + LOCAL_PORT);
+// }).listen(LOCAL_PORT);
 
 var maininterval = null;
 //主通道连接 向服务端发起
@@ -110,6 +159,9 @@ function openproxyconnect(proxySocket, data) {
         proxySocket.end();
     });
 }
-//打开主通道
-firstconnect();
-common.log(`配置请求端:${REMOTE_HOST}:${REMOTE_PORT}`);
+init(function () {
+    common.log(`配置请求端:${REMOTE_HOST}:${REMOTE_PORT}`);
+    common.log(`配置服务端:${ServerProxy_HOST}:${ServerProxy_POST}`);
+    //打开主通道
+    firstconnect();
+});//初始化
