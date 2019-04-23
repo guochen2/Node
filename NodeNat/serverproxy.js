@@ -11,6 +11,7 @@ var common = require("./common").common;
 
 //主要是在监听到client端打开的链接时用
 const events = require('events');
+const emiter = new events.EventEmitter();
 
 //初始化配置 默认命令行优先级比config高
 function init(callback) {
@@ -57,48 +58,73 @@ function listentcpproxy() {
     //接收调用方的请求
     var tcpProxyServer = net.createServer(function (clientSocket) {
 
-        lock.acquire("a", function (done) {
-            co(function* () {
-                common.log("等待主");
-                var mainsocket;
-                try {
-                    mainsocket = yield waitmain();
-                    common.log("往client通信通道发起新开连接请求");
-                    mainsocket.write("open connect");
-                    var clientdata = yield waitclient();
-                    clientdata.emiter.on("selfdata", function (data) {
-                        common.log("接收到client发上来的数据 准备往用户端发送");
-                        clientSocket.write(data);
-                    })
-                    clientdata.emiter.on("selfend", function (data) {
-                        common.log("clientend");
-                        clientSocket.end();
-                    })
-                    clientdata.emiter.on("selferror", function (data) {
-                        common.log("client error");
-                        clientSocket.end();
-                    })
-                    clientSocket.on('data', function (msg) {
-                        common.log("接收到用户端发上来的数据 准备往client发送");
-                        clientdata.socket.write(msg);
-                    });
-                    clientSocket.on('end', function () {
-                        common.log('用户端end');
-                        clientdata.socket.end();
-                    });
-                    clientSocket.on('error', function (err) {
-                        console.error('用户端 error : ', err);
-                        clientdata.socket.end();
-                    });
-                } catch (e) {
-                    common.log(e);
-                    clientSocket.end();
-                }
-                done(null);
+        // lock.acquire("a", function (done) {
+        // co(function* () {
+        if (!currmainsocket) {
+            clientSocket.write("not exist client proxy");
+            clientSocket.end();
+            return;
+        }
+        // common.log("等待主");
+        // var mainsocket;
+        try {
+            // mainsocket = yield waitmain();
+            common.log("往client通信通道发起新开连接请求");
+            var uuid = common.uuid();
+            let selfdata = function (data) {
+                common.log("接收到client发上来的数据 准备往用户端发送");
+                clientSocket.write(data);
+            };
+            let selfend = function (data) {
+                common.log("clientend", uuid);
+                clientSocket.end();
+                emiter.off("selfend_" + uuid, selfend);
+                emiter.off("selfdata_" + uuid, selfdata);
+            };
+            let selferror = function (data) {
+                common.log("client error", uuid);
+                clientSocket.end();
+                emiter.off("selferror_" + uuid, selferror);
+            };
+            emiter.on("selfdata_" + uuid, selfdata).on("selfend_" + uuid, selfend).on("selferror_" + uuid, selferror);
+            // emiter.on("selfend_" + uuid, function (data) {
+            //     common.log("clientend");
+            //     clientSocket.end();
+            //     emiter.off("selfend_" + uuid);
+            //     emiter.off("selfdata_" + uuid);
+            // })
+            // emiter.on("selferror_" + uuid, function (data) {
+            //     common.log("client error");
+            //     clientSocket.end();
+            //     emiter.off("selferror_" + uuid);
+
+            // })
+            emiter.once("socket_" + uuid, function (socket) {
+                // let clientdata = yield waitclient(uuid);
+                clientSocket.on('data', function (msg) {
+                    common.log("接收到用户端发上来的数据 准备往client发送");
+                    socket.write(msg);
+                });
+                clientSocket.on('end', function () {
+                    common.log('用户端end');
+                    socket.end();
+                });
+                clientSocket.on('error', function (err) {
+                    console.error('用户端 error : ', err);
+                    socket.end();
+                });
             })
-        }, function (err, ret) {
-            // lock released
-        });
+            currmainsocket.write("openconnect_" + uuid);
+
+        } catch (e) {
+            common.log(e);
+            clientSocket.end();
+        }
+        // done(null);
+        // })
+        // }, function (err, ret) {
+        //     // lock released
+        // });
 
 
     });
@@ -117,17 +143,20 @@ function listentcpproxy() {
 function listenclientproxy() {
     //接收主动发来的客户端的请求 nodeclient端
     var clientProxyServer = net.createServer(function (clientSocket) {
-        var uuid = common.uuid();
-        var emiter;
+        // var uuid = common.uuid();
+        // var emiter;
+        var uuid;
         clientSocket.on('data', function (msg) {
             //
             if (msg.toString() == "main connect") {
                 common.log("获取到一个新的主通道");
                 currmainsocket = clientSocket;
-            } else if (msg.toString() == "client connect") {
-                common.log("获取到一个新的副通道");
-                emiter = new events.EventEmitter();
-                currclientData.push({ uuid: uuid, socket: clientSocket, emiter: emiter, useing: false })
+            } else if (msg.toString().indexOf("clientconnect_") == 0 && common.regexuuid(msg.toString())) {
+                uuid = common.getuuidbyregex(msg.toString());
+                common.log("获取到一个新的副通道", uuid);
+                // emiter = new events.EventEmitter();
+                // currclientData.push({ uuid: uuid, socket: clientSocket, useing: false })
+                emiter.emit("socket_" + uuid, clientSocket);
             } else if (msg.toString() == "main connecting") {
                 common.log("接收到client的测试main请求");
                 if (currmainsocket) {
@@ -140,23 +169,29 @@ function listenclientproxy() {
                 // var clients = currclientData.filter(a => a.uuid = uuid);
                 // if (clients.length > 0)
                 //     clients[0].emiter.emit("selfdata", msg);
-                if (emiter) {
-                    emiter.emit("selfdata", msg);
+                if (uuid) {
+                    emiter.emit("selfdata_" + uuid, msg);
                 }
 
             }
         });
         clientSocket.on('end', function () {
-            if (emiter) {
-                emiter.emit("selfend");
+            if (uuid) {
+                emiter.emit("selfend_" + uuid);
+                common.log('== clientSocket disconnected from server');
+            } else {
+                common.log('main == clientSocket disconnected from server');
+                currmainsocket = undefined;
             }
-            common.log('== clientSocket disconnected from server');
         });
         clientSocket.on('error', function (err) {
-            if (emiter) {
-                emiter.emit("selferror", err);
+            if (uuid) {
+                emiter.emit("selferror_" + uuid, err);
+                console.error('== clientSocket has error : ', err);
+            } else {
+                console.error('main == clientSocket has error : ', err);
+                currmainsocket = undefined;
             }
-            console.error('== clientSocket has error : ', err);
         });
     });
     clientProxyServer.on('error', function (error) {
@@ -174,14 +209,17 @@ var currclientData = [];//{ socket: null, emiter: null, useing: false }
 var currmainsocket;//和客户端通信的唯一通道
 
 //等待子连接
-function* waitclient() {
+function* waitclient(uuid) {
     return yield new Promise(function (resolve, reject) {
         var start = new Date();
-        if (currclientData.length > 0 && currclientData[currclientData.length - 1].useing == false) {
-            let d = currclientData[currclientData.length - 1];
-            d.useing = true;
-            resolve(d);
-            return;
+        if (currclientData.length > 0) {
+            // let d = currclientData[currclientData.length - 1];
+            // d.useing = true;
+            var d = currclientData.filter(a => a.uuid == uuid);
+            if (d.length > 0) {
+                resolve(d[0]);
+                return;
+            }
         }
         var inter = setInterval(function () {
             if (new Date().getTime() - start.getTime() > 10 * 1000) {
@@ -189,16 +227,15 @@ function* waitclient() {
                 reject("timeout");
                 return;
             }
-            if (currclientData.length > 0 && currclientData[currclientData.length - 1].useing == false) {
-                let d = currclientData[currclientData.length - 1];
-                d.useing = true;
-                clearInterval(inter);
-                resolve(d);
-                return;
+            if (currclientData.length > 0) {
+                var d = currclientData.filter(a => a.uuid == uuid);
+                if (d.length > 0) {
+                    clearInterval(inter);
+                    resolve(d[0]);
+                    return;
+                }
             }
         }, 10)
-
-
     })
 }
 
@@ -226,30 +263,36 @@ function* waitmain() {
 
 
 init(function () {
+    //监听异常
+    emiter.setMaxListeners(10000);//可以同时监听10000个
+    emiter.on("error", a => {
+        console.log("emiter异常".a);
+    });
     listentcpproxy();
     listenclientproxy();
     common.log(`监听外部client:${ServerLOCAL_PORT}`);
     common.log(`监听client:${Proxy_PORT}`);
 })
 
-//清理无效链接
-setInterval(function () {
-    //清理无效的client连接
-    var stopConnect = [];
-    currclientData.forEach(d => {
-        if (!d.socket._handle) {
-            stopConnect.push(d.uuid);
-        }
-    })
-    currclientData.forEach(d => {
-        for (var i = 0; i < currclientData.length; i++) {
-            if (currclientData[i].uuid == d.uuid) {
-                common.log("已清理掉一个请求");
-                currclientData.splice(i, 1);
-            }
-        }
-    })
-}, 2000);
+// 清理无效链接
+// setInterval(function () {
+//     //清理无效的client连接
+//     // var stopConnect = [];
+//     // currclientData.forEach(d => {
+//     //     if (!d.socket._handle) {
+//     //         stopConnect.push(d.uuid);
+//     //     }
+//     // })
+//     // currclientData.forEach(d => {
+//     //     for (var i = 0; i < currclientData.length; i++) {
+//     //         if (currclientData[i].uuid == d.uuid) {
+//     //             common.log("已清理掉一个请求");
+//     //             currclientData.splice(i, 1);
+//     //         }
+//     //     }
+//     // })
+//     // console.log(`当前总共${emiter.listenerCount()}`);
+// }, 2000);
 setInterval(function () {
     if (currmainsocket) {
         currmainsocket.write("main connecting")

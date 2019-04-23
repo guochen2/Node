@@ -3,6 +3,8 @@ var net = require('net');
 var common = require("./common").common;
 var fs = require("fs");
 const path = require("path");
+const events = require('events');
+const emiter = new events.EventEmitter();
 
 var ServerProxy_HOST, ServerProxy_POST, REMOTE_PORT, REMOTE_HOST;
 
@@ -78,8 +80,8 @@ function firstconnect() {
     });
     serviceSocket.on("data", function (data) {
         // common.log('<< From remote to proxy', data.toString());
-        if (data.toString() == "open connect") {//打开新的链接
-            openserverconnect();
+        if (data.toString().indexOf("openconnect_") == 0 && common.regexuuid(data.toString())) {//打开新的链接
+            openserverconnect(common.getuuidbyregex(data.toString()));
         } else if (data.toString() == "main connecting") {
             common.log("接收到server的测试main请求");
         }
@@ -106,31 +108,63 @@ function firstconnect() {
 }
 
 //新开一个与服务端通信的通道
-function openserverconnect() {
+function openserverconnect(uuid) {
     var proxySocket = new net.Socket();
-    proxySocket.connect(ServerProxy_POST, ServerProxy_HOST, function () {
-        common.log("客户端创建一个新通道")
-        proxySocket.write("client connect");
-    });
+    let proxy_data = function (data) {
+
+    }
+    let proxy_err = function (data) {
+
+    }
+    let proxy_end = function (data) {
+
+    }
+    emiter.on("client_data_" + uuid, d => {
+        proxySocket.write(d);
+    })
+    emiter.on("client_end_" + uuid, d => {
+        proxySocket.end();
+    })
+    emiter.on("client_error", d => {
+        proxySocket.end();
+    })
+    openproxyconnect(uuid);
     proxySocket.on("data", function (data) {
-        var clientSocket = null;
-        if ((clientSocket = proxySocket.clientSocket)) {
-            // common.log('<<  proxy has created ....', msg.toString());
-            common.log("往客户端配置的待请求地址发送请求1")
-            clientSocket.write(data);
-        } else {
-            openproxyconnect(proxySocket, data)
-        }
-    });
-    proxySocket.on('end', function () {
+        common.log("往客户端配置的待请求地址发送请求1")
+        emiter.emit("proxy_data_" + uuid, data);
+    })
+    proxySocket.on("end", function (data) {
         common.log('客户端与服务端的副请求socket end');
-        if (proxySocket.clientSocket) proxySocket.clientSocket.end();
-    });
-    //服务端连接出问题，断开客户端
-    proxySocket.on('error', function (err) {
+        emiter.emit("proxy_end_" + uuid);
+    })
+    proxySocket.on("error", function (data) {
         common.log('客户端与服务端的副请求socket err', err);
-        if (proxySocket.clientSocket) proxySocket.clientSocket.end();
+        emiter.emit("proxy_error", data);
+    })
+
+    proxySocket.connect(ServerProxy_POST, ServerProxy_HOST, function () {
+        common.log("客户端创建一个新通道", uuid)
+        proxySocket.write("clientconnect_" + uuid);
     });
+    // proxySocket.on("data", function (data) {
+    //     var clientSocket = null;
+    //     if ((clientSocket = proxySocket.clientSocket)) {
+    //         // common.log('<<  proxy has created ....', msg.toString());
+    //         common.log("往客户端配置的待请求地址发送请求1")
+    //         clientSocket.write(data);
+    //     } else {
+    //         openproxyconnect(proxySocket, data)
+    //     }
+    // });
+    // proxySocket.on('end', function () {
+    //     common.log('客户端与服务端的副请求socket end');
+    //     if (proxySocket.clientSocket) proxySocket.clientSocket.end();
+    // });
+    // //服务端连接出问题，断开客户端
+    // proxySocket.on('error', function (err) {
+    //     common.log('客户端与服务端的副请求socket err', err);
+    //     if (proxySocket.clientSocket) proxySocket.clientSocket.end();
+    // });
 }
 
 //若服务端与client链接关闭 则client与目标通信也要关闭
@@ -138,34 +172,53 @@ function openserverconnect() {
 
 
 //与目标地址通信的通道
-function openproxyconnect(proxySocket, data) {
+function openproxyconnect(uuid) {
     common.log("打开客户端配置的待请求地址socket")
     var clientSocket = new net.Socket();
-    proxySocket.clientSocket = clientSocket;
+    //proxySocket.clientSocket = clientSocket;
     clientSocket.connect(REMOTE_PORT, REMOTE_HOST, function () {
         common.log("往客户端配置的待请求地址发送请求2")
         // common.log('>> From proxy to remote', msg.toString());
-        clientSocket.write(data);
+        // clientSocket.write(data);
     });
     clientSocket.on("data", function (data) {
-        common.log("往服务端发送数据去");
+        common.log("往服务端发送数据");
         // common.log('<< From remote to proxy', data.toString());
-        proxySocket.write(data);
+        //proxySocket.write(data);
+        emiter.emit("client_data_" + uuid, data);
         // common.log('invokeTime : ', invokeTime++)
     });
     clientSocket.on('end', function () {
         common.log('客户端与配置的请求地址socket end');
-        proxySocket.end();
+        // proxySocket.clientSocket = null;
+        // proxySocket.end();
+        emiter.emit("client_end_" + uuid);
     });
     //服务端连接出问题，断开客户端
     clientSocket.on('error', function (err) {
         console.error('客户端与配置的请求地址socket error ', err);
-        proxySocket.end();
+        // proxySocket.clientSocket = null;
+        // proxySocket.end();
+        emiter.emit("client_error_" + uuid);
     });
+    emiter.on("proxy_data_" + uuid, d => {
+        clientSocket.write(d);
+    })
+    emiter.on("proxy_end_" + uuid, d => {
+        clientSocket.end();
+    })
+    emiter.on("proxy_error_" + uuid, d => {
+        clientSocket.end();
+    })
 }
 init(function () {
     common.log(`配置请求端:${REMOTE_HOST}:${REMOTE_PORT}`);
     common.log(`配置服务端:${ServerProxy_HOST}:${ServerProxy_POST}`);
+
+    emiter.setMaxListeners(10000);//可以同时监听10000个
+    emiter.on("error", a => {
+        console.log("emiter异常".a);
+    });
     //打开主通道
     firstconnect();
 });//初始化
